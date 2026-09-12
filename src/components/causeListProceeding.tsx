@@ -22,6 +22,7 @@ export default function CauseListProceeding({ complaintNo, parties, hearingDate,
 
   const [isAddingDiary, setIsAddingDiary] = useState(false);
   const [newDiaryEntry, setNewDiaryEntry] = useState('');
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
   
   if (!complaint) return null;
 
@@ -30,7 +31,8 @@ export default function CauseListProceeding({ complaintNo, parties, hearingDate,
       addAttendance(complaintNo, hearingDate, complainantAttendance, respondentAttendance);
       setComplainantAttendance('');
       setRespondentAttendance('');
-      alert("Attendance saved successfully!");
+      setSaveSuccessMessage("Attendance saved successfully!");
+      setTimeout(() => setSaveSuccessMessage(null), 3000);
     }
   };
 
@@ -102,7 +104,12 @@ export default function CauseListProceeding({ complaintNo, parties, hearingDate,
               />
             </div>
           </div>
-          <div className="px-5 py-3 border-t border-neutral-100 bg-neutral-50 flex justify-end">
+          <div className="px-5 py-3 border-t border-neutral-100 bg-neutral-50 flex items-center justify-between">
+            {saveSuccessMessage ? (
+              <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                {saveSuccessMessage}
+              </span>
+            ) : <div />}
             <button 
               onClick={handleSaveAttendance}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
