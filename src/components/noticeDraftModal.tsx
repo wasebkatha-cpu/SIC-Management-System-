@@ -1,0 +1,2157 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { 
+  X, 
+  Printer, 
+  Copy, 
+  Check, 
+  FileText, 
+  Send, 
+  Edit3, 
+  Plus, 
+  Scale, 
+  Clock,
+  Sparkles,
+  AlertCircle,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  List,
+  ListOrdered,
+  Indent,
+  Outdent,
+  Undo,
+  Redo,
+  Highlighter,
+  Baseline,
+  RemoveFormatting,
+  RotateCcw,
+  Heading1,
+  Heading2,
+  Heading3,
+  Quote,
+  Minus,
+  Maximize2,
+  Minimize2,
+  Type,
+  Image as ImageIcon,
+  ImagePlus,
+  ZoomIn,
+  ZoomOut,
+  Trash2,
+  Move,
+  Pencil,
+  Tag,
+  Bookmark,
+  Share2,
+  FileDown
+} from 'lucide-react';
+import { ComplaintData, useAppContext } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
+import { 
+  saveNoticeDraft, 
+  resolveComplaintContacts, 
+  NoticeDraftRecord, 
+  getDraftsForComplaint 
+} from '../utils/draftStorage';
+import { downloadDraftNoticePdf } from '../utils/draftPdfGenerator';
+import DraftDispatchModal from './DraftDispatchModal';
+
+export interface NoticeTypeConfig {
+  id: string;
+  title: string;
+  stageName: string;
+  category: 'Notice' | 'Order';
+  tag: string;
+  tagColor: string;
+  iconType: string;
+  description: string;
+  isCustom?: boolean;
+}
+
+export const NOTICE_TYPES: NoticeTypeConfig[] = [
+  {
+    id: 'call-report',
+    title: 'Notice for Call Report',
+    stageName: 'Call report',
+    category: 'Notice',
+    tag: 'Initial Report',
+    tagColor: 'bg-blue-50 text-blue-700 border-blue-200',
+    iconType: 'FileText',
+    description: 'Directs the public body to submit preliminary comments & report'
+  },
+  {
+    id: 'first-notice',
+    title: 'First Notice',
+    stageName: 'First Notice issued',
+    category: 'Notice',
+    tag: '1st Summons',
+    tagColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    iconType: 'Mail',
+    description: 'Initial formal summons to designated official & respondent body'
+  },
+  {
+    id: 'final-notice',
+    title: 'Final Notice',
+    stageName: 'Final Notice issued',
+    category: 'Notice',
+    tag: 'Urgent Notice',
+    tagColor: 'bg-amber-50 text-amber-700 border-amber-200',
+    iconType: 'AlertCircle',
+    description: 'Preemptory notice on failure to comply with initial notice'
+  },
+  {
+    id: 'repeat-final-notice',
+    title: 'Repeat Final Notice',
+    stageName: 'Repeat Final Notice issued',
+    category: 'Notice',
+    tag: 'Final Warning',
+    tagColor: 'bg-orange-50 text-orange-700 border-orange-200',
+    iconType: 'AlertCircle',
+    description: 'Last opportunity before initiating statutory penalty proceedings'
+  },
+  {
+    id: 'show-cause-notice',
+    title: 'Show Cause Notice',
+    stageName: 'Show Cause Notice Issued',
+    category: 'Notice',
+    tag: 'Sec. 15 Penalty',
+    tagColor: 'bg-rose-50 text-rose-700 border-rose-200',
+    iconType: 'AlertCircle',
+    description: 'Show cause why penalty under Section 15 should not be imposed'
+  },
+  {
+    id: 'final-show-cause-notice',
+    title: 'Final Show Cause Notice',
+    stageName: 'Final Show Cause Notice Issued',
+    category: 'Notice',
+    tag: 'Conclusive Penalty',
+    tagColor: 'bg-red-50 text-red-700 border-red-200',
+    iconType: 'AlertCircle',
+    description: 'Final show cause prior to recovery of fine or disciplinary action'
+  },
+  {
+    id: 'adjournment-order',
+    title: 'Adjournment Order',
+    stageName: 'Adjournment Order Issued',
+    category: 'Order',
+    tag: 'Date Fixed',
+    tagColor: 'bg-purple-50 text-purple-700 border-purple-200',
+    iconType: 'Clock',
+    description: 'Records reasons for adjournment and fixes next hearing date'
+  },
+  {
+    id: 'hearing-order',
+    title: 'Interim Hearing Order',
+    stageName: 'Order issued',
+    category: 'Order',
+    tag: 'Bench Order',
+    tagColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    iconType: 'Scale',
+    description: 'Interim directions on production of documents and attendance'
+  },
+  {
+    id: 'disposed-off-order',
+    title: 'Final / Disposed-Off Order',
+    stageName: 'Disposed-Off Order issued',
+    category: 'Order',
+    tag: 'Final Disposal',
+    tagColor: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    iconType: 'Check',
+    description: 'Final order disposing off complaint with statutory directives'
+  }
+];
+
+export interface StatutoryClauseSnippet {
+  id: string;
+  label: string;
+  html: string;
+}
+
+export const STATUTORY_SNIPPETS: StatutoryClauseSnippet[] = [
+  {
+    id: 'sec-11',
+    label: 'Sec. 11 Cognizance',
+    html: '<p><strong>Section 11 Cognizance:</strong> That the Commission, in exercise of powers conferred under <strong>Section 11(3) of the Sindh Transparency and Right to Information Act, 2016</strong>, takes cognizance of the non-provision of requested public records and directs the Designated Official to submit a comprehensive compliance report.</p>'
+  },
+  {
+    id: 'sec-10',
+    label: 'Sec. 10 Statutory 21 Days',
+    html: '<p><strong>Statutory 21-Day Limitation:</strong> That under <strong>Section 10(1) of the Act</strong>, it is the statutory obligation of the Public Information Officer / Designated Official to either provide the requested certified records or convey justifiable reasons for refusal within <strong>twenty-one (21) working days</strong> of receipt of the request.</p>'
+  },
+  {
+    id: 'sec-15',
+    label: 'Sec. 15 Penal Warning',
+    html: '<p><strong>Penal Warning under Section 15:</strong> Take notice that persistent default or failure to comply with the directions of this Commission shall render the Designated Official liable to penal proceedings under <strong>Section 15 of the Sindh Transparency and Right to Information Act, 2016</strong>, including fine up to statutory ceiling and recommendation for departmental disciplinary proceedings.</p>'
+  },
+  {
+    id: 'art-19a',
+    label: 'Article 19-A Constitutional Right',
+    html: '<p><strong>Article 19-A Fundamental Right:</strong> That access to certified public information is a constitutionally guaranteed fundamental right under <strong>Article 19-A of the Constitution of the Islamic Republic of Pakistan</strong>, and public records cannot be withheld except under express statutory exemption provided under Section 5 of the Act.</p>'
+  },
+  {
+    id: 'hearing-summon',
+    label: 'Mandatory Hearing Attendance',
+    html: '<p><strong>Mandatory Personal Appearance:</strong> Both parties are hereby directed to note that the hearing of this matter is fixed before the Commission at Karachi. Personal attendance of the Designated Official with original records is mandatory; failure to appear will result in <em>ex-parte</em> proceedings.</p>'
+  },
+  {
+    id: 'certified-copies',
+    label: 'Supply Certified Copies',
+    html: '<p><strong>Direction to Supply Certified Copies:</strong> The Respondent Public Body is hereby ordered to provide certified and duly attested photocopies of the requisitioned public documents to the Complainant within <strong>seven (7) days</strong> under official receipt.</p>'
+  }
+];
+
+export function generateDefaultDraftHtml(notice: NoticeTypeConfig, complaint: ComplaintData): string {
+  const hearingDate = complaint.nextHearingDate || 'To be scheduled';
+  const cName = complaint.complainantName || 'Complainant';
+  const rName = complaint.respondentName || 'Respondent Public Body';
+  const cNo = complaint.complaintNo || 'SIC-2026-01';
+  const currentDate = new Date().toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).replace(/\//g, '-');
+
+  let parawiseHtml = '';
+
+  switch (notice.id) {
+    case 'call-report':
+      parawiseHtml = `
+<p>1. That the complainant, <strong>${cName}</strong>, has filed a complaint under <strong>Section 11 of the Sindh Transparency and Right to Information Act, 2016</strong>, stating that an application for provision of certified public records was duly submitted to the Designated Official of <strong>${rName}</strong>, but the requested information was not provided within the prescribed statutory period.</p>
+<p>2. That under <strong>Section 10</strong> of the Sindh Transparency and Right to Information Act, 2016, it is the statutory obligation of the Public Information Officer / Designated Official to either provide the requested information or convey reasons for refusal within <strong>twenty-one (21) working days</strong> of receipt of the request.</p>
+<p>3. That the Commission, in exercise of powers conferred under <strong>Section 11(3) of the Act</strong>, takes cognizance of the non-provision of information and calls upon the Respondent Public Body to submit a comprehensive <strong>Call Report</strong> on the status of the applicant's RTI request.</p>
+<p>4. The Respondent Public Body is hereby directed to submit parawise comments along with attested copies of the requisite records, or explain justifiable statutory grounds under <strong>Section 5</strong> if any exemption is claimed, within <strong>seven (7) days</strong> of receipt of this notice.</p>
+<p>5. Both parties are notified that the matter shall be taken up before the Commission on <strong>${hearingDate} at 10:30 AM</strong> at the Sindh Information Commission, Karachi. Failure to submit the report shall result in appropriate statutory orders.</p>
+`;
+      break;
+
+    case 'first-notice':
+      parawiseHtml = `
+<p>1. That the complainant, <strong>${cName}</strong>, has preferred this appeal/complaint before the Sindh Information Commission against <strong>${rName}</strong> on grounds of non-compliance with the statutory mandate of the Sindh Transparency and Right to Information Act, 2016.</p>
+<p>2. That the complainant's request for obtaining official documents and certified information has remained unanswered without lawful justification, prima facie frustrating the citizen's constitutional right to information as enshrined under <strong>Article 19-A of the Constitution of the Islamic Republic of Pakistan</strong>.</p>
+<p>3. That this <strong>First Notice</strong> is hereby formally issued to the Designated Official / Head of <strong>${rName}</strong> to appear in person or through an authorized representative duly conversant with the facts of the case before the Commission.</p>
+<p>4. The Respondent is directed to file detailed parawise comments addressing each question and document requisitioned by the Complainant, and to furnish one advance copy thereof to the Complainant prior to the scheduled hearing.</p>
+<p>5. Take notice that the hearing of this case is fixed on <strong>${hearingDate} at 10:30 AM</strong>. In the event of default in appearance or submission of parawise comments, the Commission may proceed <em>ex-parte</em> and issue directions under the relevant schedule of the Act.</p>
+`;
+      break;
+
+    case 'final-notice':
+      parawiseHtml = `
+<p>1. That despite issuance of initial notices and communications by the Commission in <strong>Complaint No. ${cNo}</strong>, the Designated Official / Public Body (<strong>${rName}</strong>) has failed to submit parawise comments or produce the certified public records sought by <strong>${cName}</strong>.</p>
+<p>2. That non-compliance with the directions of the Commission violates <strong>Section 11</strong> of the Sindh Transparency and Right to Information Act, 2016 and causes unwarranted delay in the administration of justice.</p>
+<p>3. That this <strong>Final Notice</strong> is hereby served as a preemptory opportunity to the Respondent Public Body to submit complete parawise comments and provide the requisitioned records without further delay.</p>
+<p>4. The Designated Official is directed to appear in person before the Commission on the appointed date along with the entire original case record and a written explanation for previous non-compliance.</p>
+<p>5. Notice is hereby given that the case will be heard on <strong>${hearingDate} at 10:30 AM</strong>. Failure to comply will lead to initiation of penal proceedings under <strong>Section 15 of the Act</strong> without further notice.</p>
+`;
+      break;
+
+    case 'repeat-final-notice':
+      parawiseHtml = `
+<p>1. That repeated notices issued by the Commission have not yielded compliance from <strong>${rName}</strong> in Complaint No. <strong>${cNo}</strong> filed by <strong>${cName}</strong>.</p>
+<p>2. That the persistent failure of the Designated Official to submit parawise comments or appear before the Commission constitutes wilful disregard of statutory obligations under the Sindh Transparency and Right to Information Act, 2016.</p>
+<p>3. That this <strong>Repeat Final Notice</strong> is issued as a last and final warning before the Commission exercises its coercive powers under <strong>Section 11(3) and Section 15</strong> of the Act.</p>
+<p>4. The Respondent is ordered to furnish the complete requested information to the Complainant under intimation to this Commission within <strong>five (5) days</strong>, or appear before the Bench with parawise justification.</p>
+<p>5. Hearing is fixed for <strong>${hearingDate} at 10:30 AM</strong>. If the Respondent remains absent or fails to comply, ex-parte decision and formal penal inquiry shall be ordered on the same date.</p>
+`;
+      break;
+
+    case 'show-cause-notice':
+      parawiseHtml = `
+<p>1. <strong>WHEREAS</strong>, a complaint under <strong>Section 11 of the Sindh Transparency and Right to Information Act, 2016</strong> was filed by <strong>${cName}</strong> against <strong>${rName}</strong> for withholding certified public records.</p>
+<p>2. <strong>AND WHEREAS</strong>, the Designated Official has repeatedly failed to furnish the requested records or submit parawise comments despite service of notices by this Commission.</p>
+<p>3. <strong>NOW THEREFORE</strong>, you, the Designated Official / Public Information Officer of <strong>${rName}</strong>, are hereby called upon to <strong>SHOW CAUSE</strong> in writing within seven (7) days as to why penal proceedings under <strong>Section 15</strong> of the Sindh Transparency and Right to Information Act, 2016 should not be initiated against you for failure to discharge duties without reasonable cause.</p>
+<p>4. You are further directed to submit your parawise response to the allegations of mala fide delay and non-provision of public records.</p>
+<p>5. Take notice that you are required to appear personally before the Commission on <strong>${hearingDate} at 10:30 AM</strong> to show cause. In case of default, fine up to statutory limits and recommendation for disciplinary action under efficiency and discipline rules may be passed.</p>
+`;
+      break;
+
+    case 'final-show-cause-notice':
+      parawiseHtml = `
+<p>1. <strong>WHEREAS</strong>, a Show Cause Notice was previously served upon the Designated Official of <strong>${rName}</strong> regarding wilful non-compliance and withholding of public documents in Complaint No. <strong>${cNo}</strong>.</p>
+<p>2. <strong>AND WHEREAS</strong>, the explanation tendered, if any, is unsatisfactory and the requisitioned public records have still not been provided to <strong>${cName}</strong>.</p>
+<p>3. <strong>NOW THEREFORE</strong>, this <strong>Final Show Cause Notice</strong> is issued calling upon you to show cause why maximum penalty under <strong>Section 15 of the Act</strong> should not be deducted from your salary and why the Commission should not write to the Competent Authority for initiation of departmental disciplinary proceedings.</p>
+<p>4. You are directed to file final parawise comments and provide complete certified records to the Complainant on or before <strong>${hearingDate}</strong>.</p>
+<p>5. Personal appearance of the Designated Official is mandatory on <strong>${hearingDate} at 10:30 AM</strong>. No adjournment shall be granted under any circumstances.</p>
+`;
+      break;
+
+    case 'adjournment-order':
+      parawiseHtml = `
+<p>1. Case called for hearing. The Complainant (<strong>${cName}</strong>) was represented by ${complaint.counselorComplainant || 'Counsel'}. The Respondent (<strong>${rName}</strong>) was represented by ${complaint.counselorRespondent || 'Representative'}.</p>
+<p>2. The representative of the Respondent requested time to file parawise comments and obtain instructions from the Competent Authority regarding disclosure of the requested records.</p>
+<p>3. The Complainant raised objection to repeated delays and submitted that the information sought is purely public in nature and does not fall under any exemption clause of <strong>Section 5</strong>.</p>
+<p>4. Having heard both sides, the Commission, in the interest of justice and as a final indulgence, adjourns the proceedings subject to the condition that complete parawise comments and records must be submitted at least three days prior to the next date.</p>
+<p>5. The matter stands adjourned to <strong>${hearingDate} at 10:30 AM</strong> for final hearing and order. Both parties are directed to note the date.</p>
+`;
+      break;
+
+    case 'hearing-order':
+      parawiseHtml = `
+<p>1. Case taken up for hearing at the Sindh Information Commission, Karachi. The Complainant, <strong>${cName}</strong>, and the authorized officer of <strong>${rName}</strong> appeared before the Bench.</p>
+<p>2. Parawise comments submitted by the Respondent Public Body were perused by the Commission. The Complainant examined the same and identified specific items still withheld.</p>
+<p>3. The Commission observes that under the preamble and provisions of the <strong>Sindh Transparency and Right to Information Act, 2016</strong>, public information must be accessible to citizens with minimum exceptions.</p>
+<p>4. The Respondent is hereby directed to provide certified copies of items No. 1 to 4 of the RTI application to the Complainant within <strong>seven (7) days</strong> under receipt.</p>
+<p>5. Compliance report along with proof of receipt shall be placed on record on the next date of hearing, i.e., <strong>${hearingDate} at 10:30 AM</strong>.</p>
+`;
+      break;
+
+    case 'disposed-off-order':
+      parawiseHtml = `
+<p>1. This order disposes of <strong>Complaint No. ${cNo}</strong> filed by <strong>${cName}</strong> against <strong>${rName}</strong> under <strong>Section 11 of the Sindh Transparency and Right to Information Act, 2016</strong>.</p>
+<p>2. During proceedings before the Commission, the Respondent Public Body submitted parawise comments and supplied certified copies of the requisite records to the Complainant.</p>
+<p>3. The Complainant has acknowledged receipt of the complete information and expressed satisfaction with the records provided by the department.</p>
+<p>4. The Commission records its appreciation for the eventual compliance, and reminds the Respondent Public Body to proactively maintain and disclose public records under <strong>Section 4 of the Act</strong>.</p>
+<p>5. The grievance of the Complainant stands resolved. Consequently, the complaint is hereby disposed of with no further orders as to costs or penalties.</p>
+`;
+      break;
+
+    default:
+      if (notice.category === 'Order') {
+        parawiseHtml = `
+<p>1. <strong>Case Proceedings:</strong> Case taken up for consideration / hearing before the Sindh Information Commission, Karachi in <strong>Complaint No. ${cNo}</strong> titled <em>${cName} V/s ${rName}</em>.</p>
+<p>2. <strong>Submissions &amp; Perusal of Record:</strong> Having examined the complaint filed under <strong>Section 11 of the Sindh Transparency and Right to Information Act, 2016</strong>, and having perused the submissions of the parties and departmental file records, the Commission hereby issues the following order:</p>
+<p>3. <strong>Directives of the Commission:</strong> [Specify specific bench directions, document production directives, or operative orders here...]</p>
+<p>4. <strong>Compliance Directive:</strong> The Respondent Public Body / Designated Official is directed to implement the above directions and submit a formal compliance report to this Commission within <strong>ten (10) days</strong> of receipt of this order.</p>
+<p>5. <strong>Next Hearing / Date Fixed:</strong> Both parties are directed to note that the matter stands fixed for further compliance review on <strong>${hearingDate} at 10:30 AM</strong> before the Commission at Karachi.</p>
+`;
+      } else {
+        parawiseHtml = `
+<p>1. <strong>Statutory Cognizance:</strong> That the complainant, <strong>${cName}</strong>, has filed a complaint under <strong>Section 11 of the Sindh Transparency and Right to Information Act, 2016</strong> against <strong>${rName}</strong> on grounds of non-provision of certified public information.</p>
+<p>2. <strong>Notice Requisition:</strong> Take notice that this <strong>${notice.title}</strong> is hereby issued to the Designated Official / Head of Department regarding [Specify subject matter, document requisition, or explanation required...].</p>
+<p>3. <strong>Submission of Response:</strong> You are hereby directed to submit parawise comments along with certified copies of the requisite records, or explain justifiable grounds under Section 5 if any exemption is claimed, within <strong>seven (7) days</strong> of receipt of this notice.</p>
+<p>4. <strong>Scheduled Hearing:</strong> Both parties are hereby notified that the hearing of this matter is fixed on <strong>${hearingDate} at 10:30 AM</strong> before the Sindh Information Commission at Karachi.</p>
+<p>5. <strong>Consequence of Default:</strong> Failure to comply with this notice or remain absent on the scheduled date shall lead to initiation of proceedings under <strong>Section 15 of the Act</strong> without further notice.</p>
+`;
+      }
+      break;
+  }
+
+  return `
+<div class="legal-draft-document font-serif" style="font-family: 'Merriweather', Georgia, serif; line-height: 1.65; color: #111827;">
+  
+  <!-- Letterhead Header -->
+  <div style="text-align: center; border-bottom: 2px solid #065f46; padding-bottom: 14px; margin-bottom: 18px;">
+    <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #065f46; font-weight: 700; font-family: ui-sans-serif, system-ui, sans-serif; margin-bottom: 4px;">
+      Government of Sindh
+    </div>
+    <h1 style="font-size: 20px; font-weight: 800; text-transform: uppercase; color: #111827; margin: 0; letter-spacing: -0.3px; font-family: ui-sans-serif, system-ui, sans-serif;">
+      IN THE SINDH INFORMATION COMMISSION AT KARACHI
+    </h1>
+    <p style="font-size: 12px; color: #6b7280; margin-top: 4px; margin-bottom: 0; font-family: ui-sans-serif, system-ui, sans-serif;">
+      Sindh Secretariat, 4th Floor, Court Road, Karachi • Tel: (021) 99201234 • Email: info@sic.sindh.gov.pk
+    </p>
+  </div>
+
+  <!-- Reference & Date -->
+  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 16px; font-size: 13px; font-family: ui-sans-serif, system-ui, sans-serif;">
+    <div>
+      <span style="color: #6b7280;">Case Reference: </span>
+      <strong style="color: #065f46; font-size: 14px;">Complaint No. ${cNo}</strong>
+    </div>
+    <div>
+      <span style="color: #6b7280;">Date of Issuance: </span>
+      <strong style="color: #111827;">${currentDate}</strong>
+    </div>
+  </div>
+
+  <!-- Parties Specification -->
+  <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; text-align: center; font-family: ui-sans-serif, system-ui, sans-serif;">
+    <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; margin-bottom: 3px;">
+      Cause Title / Before the Commission:
+    </div>
+    <div style="font-size: 17px; font-weight: 700; color: #111827;">
+      ${cName} <span style="color: #059669; font-weight: normal; font-style: italic; margin: 0 8px;">V/s</span> ${rName}
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 11px; color: #6b7280; margin-top: 6px; border-top: 1px solid #e5e7eb; padding-top: 4px;">
+      <span>(Complainant / Appellant)</span>
+      <span>(Respondent Public Body)</span>
+    </div>
+  </div>
+
+  <!-- Subject Line -->
+  <div style="background-color: #f3f4f6; border-left: 4px solid #065f46; padding: 10px 14px; margin-bottom: 16px; font-size: 12.5px; font-weight: 700; color: #111827; text-transform: uppercase; font-family: ui-sans-serif, system-ui, sans-serif;">
+    SUBJECT: RTI (COMPLAINT) UNDER SECTION 11 OF THE SINDH TRANSPARENCY &amp; RIGHT TO INFORMATION ACT, 2016
+  </div>
+
+  <!-- Notice / Order Title Banner -->
+  <div class="notice-title-banner" style="text-align: center; background-color: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-weight: 800; font-size: 13.5px; letter-spacing: 1px; padding: 7px 14px; border-radius: 4px; text-transform: uppercase; margin-bottom: 18px; font-family: ui-sans-serif, system-ui, sans-serif;">
+    --- ${notice.title.toUpperCase()} ---
+  </div>
+
+  <!-- Parawise Comments Section Heading -->
+  <div style="font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; font-family: ui-sans-serif, system-ui, sans-serif;">
+    PARAWISE COMMENTS OF THE DRAFT:
+  </div>
+
+  <!-- Parawise Comments Body -->
+  <div class="draft-parawise-body" style="font-size: 13.5px; text-align: justify;">
+    ${parawiseHtml}
+  </div>
+
+  <!-- Sign-off & Seal -->
+  <div style="margin-top: 36px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-family: ui-sans-serif, system-ui, sans-serif;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+      
+      <!-- Seal -->
+      <div style="border: 2px dashed #f87171; border-radius: 9999px; width: 90px; height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #dc2626; transform: rotate(-5deg); user-select: none;">
+        <span style="font-size: 8px; font-weight: 800; text-transform: uppercase; line-height: 1.1;">Sindh Information</span>
+        <span style="font-size: 8px; font-weight: 800; text-transform: uppercase; line-height: 1.1;">Commission</span>
+        <span style="font-size: 7px; font-weight: 600; margin-top: 2px;">Official Seal</span>
+        <span style="font-size: 6.5px; color: #6b7280; margin-top: 2px;">${currentDate}</span>
+      </div>
+
+      <!-- Sign-off -->
+      <div style="text-align: right;">
+        <div style="font-style: italic; font-size: 12.5px; color: #6b7280; margin-bottom: 4px; font-family: 'Merriweather', Georgia, serif;">By Order of the Commission,</div>
+        <div style="width: 180px; border-bottom: 1px solid #9ca3af; margin-bottom: 6px; margin-left: auto;"></div>
+        <div style="font-weight: 700; font-size: 13px; color: #111827;">Registrar / Authorized Officer</div>
+        <div style="font-size: 11.5px; color: #4b5563;">Sindh Information Commission</div>
+        <div style="font-size: 10.5px; color: #9ca3af;">Government of Sindh, Karachi</div>
+      </div>
+
+    </div>
+
+    <!-- Endorsements -->
+    <div style="margin-top: 20px; padding-top: 12px; border-top: 1px solid #f3f4f6; font-size: 11px; color: #6b7280;">
+      <div style="font-weight: 700; color: #374151; margin-bottom: 3px; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">
+        Copy forwarded for information &amp; immediate compliance to:
+      </div>
+      <ol style="margin: 0; padding-left: 18px; line-height: 1.55;">
+        <li>The Complainant: <strong style="color: #1f2937;">${cName}</strong></li>
+        <li>The Designated Official / Head of Department: <strong style="color: #1f2937;">${rName}</strong></li>
+        <li>Personal Staff Officer to the Chief Information Commissioner, Sindh Information Commission.</li>
+        <li>Office Record File / Bench Diary.</li>
+      </ol>
+    </div>
+
+  </div>
+
+</div>
+`.trim();
+}
+
+interface NoticeDraftModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  complaint: ComplaintData;
+  noticeConfig: NoticeTypeConfig;
+}
+
+export function NoticeDraftModal({
+  isOpen,
+  onClose,
+  complaint,
+  noticeConfig
+}: NoticeDraftModalProps) {
+  const { addProceeding, publicBodies } = useAppContext();
+  const { user, logActivity } = useAuth();
+  const isSuperUser = user?.role === 'superUser';
+  
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState<boolean>(false);
+  const [issuedSuccess, setIssuedSuccess] = useState<boolean>(false);
+  const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
+  const [wordCount, setWordCount] = useState<number>(0);
+  const [charCount, setCharCount] = useState<number>(0);
+
+  // Draft management & notification states
+  const [savedDraftSuccess, setSavedDraftSuccess] = useState<boolean>(false);
+  const [draftToastMsg, setDraftToastMsg] = useState<string | null>(null);
+  const [isDispatchModalOpen, setIsDispatchModalOpen] = useState<boolean>(false);
+  const [currentDraftRecord, setCurrentDraftRecord] = useState<NoticeDraftRecord | null>(null);
+
+  // Active formatting button states
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strikeThrough: false,
+    justifyLeft: false,
+    justifyCenter: false,
+    justifyRight: false,
+    justifyFull: false,
+    insertOrderedList: false,
+    insertUnorderedList: false,
+  });
+
+  // Dropdown states
+  const [showColorPicker, setShowColorPicker] = useState<boolean>(false);
+  const [showHighlightPicker, setShowHighlightPicker] = useState<boolean>(false);
+  const [showSnippets, setShowSnippets] = useState<boolean>(false);
+
+  // Image handling states & refs
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
+  const paperSheetRef = useRef<HTMLDivElement>(null);
+  const savedRangeRef = useRef<Range | null>(null);
+  const draggedImageRef = useRef<HTMLImageElement | null>(null);
+  const [selectedImage, setSelectedImage] = useState<HTMLImageElement | null>(null);
+  const [imageOverlayRect, setImageOverlayRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [imageCopiedToast, setImageCopiedToast] = useState<boolean>(false);
+  const [imageSizeLabel, setImageSizeLabel] = useState<string>('');
+
+  // Editable Document Title (allows custom naming and renaming)
+  const [docTitle, setDocTitle] = useState<string>(noticeConfig?.title || '');
+  const [isRenaming, setIsRenaming] = useState<boolean>(false);
+  const [renameInput, setRenameInput] = useState<string>(noticeConfig?.title || '');
+  const [titleToast, setTitleToast] = useState<string>('');
+
+  // Local storage key for draft caching
+  const draftStorageKey = (complaint && noticeConfig) ? `sic_draft_${complaint.complaintNo}_${noticeConfig.id}` : '';
+
+  // Calculate word and character counts
+  const updateCounts = useCallback(() => {
+    if (!editorRef.current) return;
+    const text = editorRef.current.innerText || '';
+    setCharCount(text.length);
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    setWordCount(words);
+  }, []);
+
+  // Update active format states based on selection
+  const updateActiveFormats = useCallback(() => {
+    try {
+      setActiveFormats({
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+        strikeThrough: document.queryCommandState('strikeThrough'),
+        justifyLeft: document.queryCommandState('justifyLeft'),
+        justifyCenter: document.queryCommandState('justifyCenter'),
+        justifyRight: document.queryCommandState('justifyRight'),
+        justifyFull: document.queryCommandState('justifyFull'),
+        insertOrderedList: document.queryCommandState('insertOrderedList'),
+        insertUnorderedList: document.queryCommandState('insertUnorderedList'),
+      });
+    } catch {
+      // Browser selection context
+    }
+  }, []);
+
+  // Enhance all images in the editor with drag/interaction attributes
+  const enhanceImages = useCallback(() => {
+    if (!editorRef.current) return;
+    const imgs = editorRef.current.querySelectorAll('img');
+    imgs.forEach((img) => {
+      img.draggable = true;
+      if (!img.style.cursor) img.style.cursor = 'grab';
+      if (!img.style.maxWidth) img.style.maxWidth = '100%';
+      img.classList.add('editor-inserted-image');
+    });
+  }, []);
+
+  // Recalculate overlay position relative to paperSheetRef
+  const updateOverlayPosition = useCallback(() => {
+    if (!selectedImage || !paperSheetRef.current) {
+      setImageOverlayRect(null);
+      return;
+    }
+    if (!document.body.contains(selectedImage)) {
+      setSelectedImage(null);
+      setImageOverlayRect(null);
+      return;
+    }
+
+    const paperRect = paperSheetRef.current.getBoundingClientRect();
+    const imgRect = selectedImage.getBoundingClientRect();
+
+    setImageOverlayRect({
+      top: imgRect.top - paperRect.top,
+      left: imgRect.left - paperRect.left,
+      width: imgRect.width,
+      height: imgRect.height,
+    });
+    setImageSizeLabel(`${Math.round(imgRect.width)} × ${Math.round(imgRect.height)}px`);
+  }, [selectedImage]);
+
+  // Load initial content into editor
+  useEffect(() => {
+    if (!isOpen || !noticeConfig || !complaint) return;
+
+    setDocTitle(noticeConfig.title);
+    setRenameInput(noticeConfig.title);
+    setIsRenaming(false);
+
+    const cachedDraft = draftStorageKey ? localStorage.getItem(draftStorageKey) : null;
+    const initialHtml = cachedDraft || generateDefaultDraftHtml(noticeConfig, complaint);
+
+    // Look up existing draft record in drafts registry
+    const existing = getDraftsForComplaint(complaint.complaintNo).find(d => d.noticeTypeId === noticeConfig.id);
+    if (existing) {
+      setCurrentDraftRecord(existing);
+    } else {
+      setCurrentDraftRecord(null);
+    }
+
+    if (editorRef.current) {
+      editorRef.current.innerHTML = initialHtml;
+      updateCounts();
+      updateActiveFormats();
+      enhanceImages();
+    }
+    setIssuedSuccess(false);
+    setCopied(false);
+    setSavedDraftSuccess(false);
+    setDraftToastMsg(null);
+    setSelectedImage(null);
+  }, [isOpen, noticeConfig, complaint, draftStorageKey, updateCounts, updateActiveFormats, enhanceImages]);
+
+  // Update overlay whenever image changes or window resizes
+  useEffect(() => {
+    updateOverlayPosition();
+    enhanceImages();
+
+    const handleResizeOrScroll = () => {
+      updateOverlayPosition();
+    };
+
+    window.addEventListener('resize', handleResizeOrScroll);
+    return () => {
+      window.removeEventListener('resize', handleResizeOrScroll);
+    };
+  }, [selectedImage, updateOverlayPosition, enhanceImages]);
+
+  // Listen to selection changes for toolbar active states
+  useEffect(() => {
+    const handleSelection = () => {
+      if (document.activeElement === editorRef.current || editorRef.current?.contains(document.activeElement)) {
+        updateActiveFormats();
+      }
+    };
+    document.addEventListener('selectionchange', handleSelection);
+    return () => document.removeEventListener('selectionchange', handleSelection);
+  }, [updateActiveFormats]);
+
+  // Cross-browser helper to get caret Range from client coordinate
+  const getRangeFromPoint = (clientX: number, clientY: number): Range | null => {
+    if (document.caretRangeFromPoint) {
+      return document.caretRangeFromPoint(clientX, clientY);
+    }
+    const doc = document as any;
+    if (doc.caretPositionFromPoint) {
+      const pos = doc.caretPositionFromPoint(clientX, clientY);
+      if (pos) {
+        const range = document.createRange();
+        range.setStart(pos.offsetNode, pos.offset);
+        range.collapse(true);
+        return range;
+      }
+    }
+    return null;
+  };
+
+  // Save selection before opening modal/picker
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      if (editorRef.current && editorRef.current.contains(range.commonAncestorContainer)) {
+        savedRangeRef.current = range.cloneRange();
+      }
+    }
+  };
+
+  const complaintNo = complaint?.complaintNo || 'SIC-2026-01';
+
+  // Rich text command execution
+  const executeCommand = (command: string, value: string | undefined = undefined) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    document.execCommand(command, false, value);
+    updateActiveFormats();
+    updateCounts();
+    enhanceImages();
+
+    // Cache locally
+    if (draftStorageKey) {
+      localStorage.setItem(draftStorageKey, editorRef.current.innerHTML);
+    }
+  };
+
+  const handleEditorInput = () => {
+    updateCounts();
+    enhanceImages();
+    if (draftStorageKey && editorRef.current) {
+      localStorage.setItem(draftStorageKey, editorRef.current.innerHTML);
+    }
+  };
+
+  // Insert image at cursor selection or target range
+  const insertImageAtRange = (dataUrl: string, targetRange?: Range | null) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+
+    let range = targetRange;
+    if (!range) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editorRef.current.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        range = sel.getRangeAt(0);
+      } else if (savedRangeRef.current) {
+        range = savedRangeRef.current;
+      }
+    }
+
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.alt = 'Document Evidence / Attachment';
+    img.draggable = true;
+    img.style.maxWidth = '100%';
+    img.style.width = '340px';
+    img.style.height = 'auto';
+    img.style.display = 'block';
+    img.style.margin = '14px auto';
+    img.style.cursor = 'grab';
+    img.className = 'editor-inserted-image border border-neutral-300 rounded shadow-xs my-2';
+    img.setAttribute('data-editor-image', 'true');
+
+    if (range) {
+      range.deleteContents();
+      range.insertNode(img);
+
+      // Create a paragraph break after if none exists
+      if (!img.nextSibling) {
+        const p = document.createElement('p');
+        p.innerHTML = '<br>';
+        img.parentNode?.appendChild(p);
+      }
+
+      const newRange = document.createRange();
+      newRange.setStartAfter(img);
+      newRange.collapse(true);
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      }
+    } else {
+      editorRef.current.appendChild(img);
+    }
+
+    enhanceImages();
+    setSelectedImage(img);
+    handleEditorInput();
+  };
+
+  // Image Upload File Handler
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          insertImageAtRange(dataUrl);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = '';
+  };
+
+  // Clipboard Paste Handler: detect and insert image anywhere
+  const handleEditorPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    const items = clipboardData.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const dataUrl = event.target?.result as string;
+              if (dataUrl) {
+                insertImageAtRange(dataUrl);
+              }
+            };
+            reader.readAsDataURL(file);
+          }
+          return;
+        }
+      }
+    }
+    setTimeout(() => {
+      enhanceImages();
+      handleEditorInput();
+    }, 50);
+  };
+
+  // Dragstart on editor: allow dragging images anywhere
+  const handleEditorDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'IMG') {
+      draggedImageRef.current = target as HTMLImageElement;
+      e.dataTransfer.setData('text/plain', (target as HTMLImageElement).src);
+      e.dataTransfer.setData('text/html', target.outerHTML);
+      e.dataTransfer.effectAllowed = 'move';
+      setImageOverlayRect(null);
+    }
+  };
+
+  const handleEditorDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  // Drop anywhere in editor: external files or internal moved images
+  const handleEditorDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+
+    // 1. External files dropped
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith('image/')) {
+        const dropRange = getRangeFromPoint(e.clientX, e.clientY);
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          if (dataUrl) {
+            insertImageAtRange(dataUrl, dropRange);
+          }
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+
+    // 2. Dragged internal image moved to new position anywhere
+    if (draggedImageRef.current) {
+      const img = draggedImageRef.current;
+      draggedImageRef.current = null;
+      const dropRange = getRangeFromPoint(e.clientX, e.clientY);
+
+      if (dropRange && editorRef.current && editorRef.current.contains(dropRange.commonAncestorContainer)) {
+        if (!img.contains(dropRange.commonAncestorContainer)) {
+          img.parentNode?.removeChild(img);
+          dropRange.insertNode(img);
+
+          const newRange = document.createRange();
+          newRange.setStartAfter(img);
+          newRange.collapse(true);
+          const sel = window.getSelection();
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+          }
+
+          setSelectedImage(img);
+          handleEditorInput();
+        }
+      }
+    }
+  };
+
+  // Click on editor to detect image selection
+  const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'IMG') {
+      setSelectedImage(target as HTMLImageElement);
+      window.getSelection()?.removeAllRanges();
+    } else {
+      setSelectedImage(null);
+    }
+  };
+
+  // Drag-to-resize corner handler
+  const handleResizeMouseDown = (e: React.MouseEvent, corner: 'se' | 'sw' | 'ne' | 'nw') => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!selectedImage) return;
+
+    const startX = e.clientX;
+    const startWidth = selectedImage.getBoundingClientRect().width;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      let deltaX = moveEvent.clientX - startX;
+      if (corner === 'sw' || corner === 'nw') {
+        deltaX = -deltaX;
+      }
+      const newWidth = Math.max(60, Math.min(700, Math.round(startWidth + deltaX)));
+      selectedImage.style.width = `${newWidth}px`;
+      selectedImage.style.height = 'auto';
+      updateOverlayPosition();
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      updateOverlayPosition();
+      handleEditorInput();
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  // Quick resize controls
+  const handleDecreaseSize = () => {
+    if (!selectedImage) return;
+    const currentW = selectedImage.getBoundingClientRect().width;
+    const newW = Math.max(60, Math.round(currentW - 35));
+    selectedImage.style.width = `${newW}px`;
+    selectedImage.style.height = 'auto';
+    updateOverlayPosition();
+    handleEditorInput();
+  };
+
+  const handleIncreaseSize = () => {
+    if (!selectedImage) return;
+    const currentW = selectedImage.getBoundingClientRect().width;
+    const newW = Math.min(720, Math.round(currentW + 35));
+    selectedImage.style.width = `${newW}px`;
+    selectedImage.style.height = 'auto';
+    updateOverlayPosition();
+    handleEditorInput();
+  };
+
+  const handleSetSizePreset = (preset: '25%' | '50%' | '75%' | '100%') => {
+    if (!selectedImage) return;
+    selectedImage.style.width = preset;
+    selectedImage.style.height = 'auto';
+    updateOverlayPosition();
+    handleEditorInput();
+  };
+
+  const handleSetAlignment = (alignment: 'left' | 'center' | 'right' | 'inline') => {
+    if (!selectedImage) return;
+    if (alignment === 'left') {
+      selectedImage.style.float = 'left';
+      selectedImage.style.margin = '6px 16px 12px 0';
+      selectedImage.style.display = 'block';
+    } else if (alignment === 'right') {
+      selectedImage.style.float = 'right';
+      selectedImage.style.margin = '6px 0 12px 16px';
+      selectedImage.style.display = 'block';
+    } else if (alignment === 'center') {
+      selectedImage.style.float = 'none';
+      selectedImage.style.margin = '14px auto';
+      selectedImage.style.display = 'block';
+    } else {
+      selectedImage.style.float = 'none';
+      selectedImage.style.margin = '4px 8px';
+      selectedImage.style.display = 'inline-block';
+      selectedImage.style.verticalAlign = 'middle';
+    }
+    updateOverlayPosition();
+    handleEditorInput();
+  };
+
+  const handleDeleteSelectedImage = () => {
+    if (!selectedImage) return;
+    selectedImage.parentNode?.removeChild(selectedImage);
+    setSelectedImage(null);
+    setImageOverlayRect(null);
+    handleEditorInput();
+  };
+
+  const handleCopySelectedImage = async () => {
+    if (!selectedImage) return;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = selectedImage.naturalWidth || selectedImage.width || 300;
+      canvas.height = selectedImage.naturalHeight || selectedImage.height || 200;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(selectedImage, 0, 0);
+        canvas.toBlob(async (blob) => {
+          if (blob && navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': blob })
+            ]);
+            setImageCopiedToast(true);
+            setTimeout(() => setImageCopiedToast(false), 2500);
+          }
+        });
+      }
+    } catch {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(selectedImage.src);
+        setImageCopiedToast(true);
+        setTimeout(() => setImageCopiedToast(false), 2500);
+      }
+    }
+  };
+
+  // Keyboard shortcut listeners for selected image (Delete, Escape, Ctrl+C)
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedImage) return;
+      if (e.key === 'Escape') {
+        setSelectedImage(null);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (document.activeElement !== editorRef.current) {
+          e.preventDefault();
+          handleDeleteSelectedImage();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        if (document.activeElement !== editorRef.current) {
+          e.preventDefault();
+          handleCopySelectedImage();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, selectedImage]);
+
+  // Quick insertion of statutory clauses
+  const handleInsertSnippet = (snippetHtml: string) => {
+    executeCommand('insertHTML', snippetHtml);
+    setShowSnippets(false);
+  };
+
+  // Reset to default template
+  const handleResetDraft = () => {
+    if (window.confirm('Reset this draft to the official default text? Any custom edits will be replaced with standard wording.')) {
+      const defaultHtml = generateDefaultDraftHtml({ ...noticeConfig, title: docTitle, stageName: docTitle }, complaint);
+      if (editorRef.current) {
+        editorRef.current.innerHTML = defaultHtml;
+        updateCounts();
+        updateActiveFormats();
+      }
+      if (draftStorageKey) {
+        localStorage.removeItem(draftStorageKey);
+      }
+    }
+  };
+
+  // Rename document title and synchronize banner
+  const handleSaveNewTitle = () => {
+    const trimmed = renameInput.trim();
+    if (!trimmed) {
+      setIsRenaming(false);
+      setRenameInput(docTitle);
+      return;
+    }
+    setDocTitle(trimmed);
+    setIsRenaming(false);
+
+    // Update banner in editor if present
+    if (editorRef.current) {
+      const banner = editorRef.current.querySelector('.notice-title-banner');
+      if (banner) {
+        banner.innerHTML = `--- ${trimmed.toUpperCase()} ---`;
+      }
+      if (draftStorageKey) {
+        localStorage.setItem(draftStorageKey, editorRef.current.innerHTML);
+      }
+      updateCounts();
+    }
+    setTitleToast(`Document title renamed to "${trimmed}"`);
+    setTimeout(() => setTitleToast(''), 3000);
+  };
+
+  // Copy draft to clipboard with rich HTML and plain text fallback
+  const handleCopy = async () => {
+    if (!editorRef.current) return;
+    try {
+      const htmlContent = editorRef.current.innerHTML;
+      const textContent = editorRef.current.innerText;
+
+      if (navigator.clipboard && window.ClipboardItem) {
+        const textBlob = new Blob([textContent], { type: 'text/plain' });
+        const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/plain': textBlob,
+            'text/html': htmlBlob
+          })
+        ]);
+      } else {
+        await navigator.clipboard.writeText(textContent);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // Fallback
+      if (editorRef.current) {
+        navigator.clipboard.writeText(editorRef.current.innerText);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      }
+    }
+  };
+
+  // Print draft
+  const handlePrint = () => {
+    window.print();
+  };
+
+  // Download official PDF of this draft
+  const handleDownloadPdf = () => {
+    if (!complaint || !noticeConfig) return;
+    const resolvedContacts = resolveComplaintContacts(complaint, publicBodies);
+    downloadDraftNoticePdf({
+      complaintNo: complaint.complaintNo,
+      complainantName: complaint.complainantName,
+      respondentDept: complaint.respondentName,
+      designatedOfficialName: resolvedContacts.respondent.officialName || complaint.designatedOfficialName,
+      designatedOfficialDesignation: resolvedContacts.respondent.designation,
+      nextHearingDate: complaint.nextHearingDate || resolvedContacts.nextHearingDate,
+      title: docTitle || noticeConfig.title,
+      category: noticeConfig.category || 'Notice',
+      contentText: editorRef.current?.innerText || '',
+      createdAt: currentDraftRecord?.createdAt || new Date().toISOString(),
+      createdByName: user?.name || user?.username || 'Official',
+      createdByRole: user?.role === 'superUser' ? 'SuperUser' : 'Admin'
+    });
+  };
+
+  // Save Draft and Notify SuperUser
+  const handleSaveDraft = async () => {
+    if (!complaint || !noticeConfig) return null;
+    const resolvedContacts = resolveComplaintContacts(complaint, publicBodies);
+
+    const draftRecord: NoticeDraftRecord = {
+      id: currentDraftRecord?.id || `draft_${complaint.complaintNo}_${noticeConfig.id}`,
+      complaintNo: complaint.complaintNo,
+      noticeTypeId: noticeConfig.id,
+      title: docTitle || noticeConfig.title,
+      category: noticeConfig.category || 'Notice',
+      contentHtml: editorRef.current?.innerHTML || '',
+      contentText: editorRef.current?.innerText || '',
+      createdAt: currentDraftRecord?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      createdBy: currentDraftRecord?.createdBy || {
+        userId: user?.uid || 'user',
+        name: user?.name || user?.username || 'Official',
+        role: user?.role === 'superUser' ? 'superUser' : 'admin'
+      },
+      complainant: resolvedContacts.complainant,
+      respondent: resolvedContacts.respondent,
+      nextHearingDate: complaint.nextHearingDate || resolvedContacts.nextHearingDate || '',
+      status: currentDraftRecord?.status || 'draft',
+      dispatches: currentDraftRecord?.dispatches || [],
+      isReadBySuperUser: isSuperUser
+    };
+
+    saveNoticeDraft(draftRecord);
+    setCurrentDraftRecord(draftRecord);
+    setSavedDraftSuccess(true);
+
+    // Desktop notification
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification(`Notice Draft Added: ${complaint.complaintNo}`, {
+          body: `Draft "${draftRecord.title}" was saved by ${draftRecord.createdBy.name} (${draftRecord.createdBy.role}). Available for review and dispatch via Gmail/WhatsApp.`,
+          icon: '/favicon.ico'
+        });
+      } catch (e) {
+        console.log('Notification error:', e);
+      }
+    }
+
+    await logActivity(`Saved notice draft "${draftRecord.title}" for case ${complaint.complaintNo}`);
+
+    const feedback = isSuperUser
+      ? 'Draft saved successfully! You can now send it to the Complainant and Designated Officer via Gmail and WhatsApp.'
+      : 'Draft saved successfully! SuperUser has been notified for review and dispatch.';
+    setDraftToastMsg(feedback);
+
+    setTimeout(() => {
+      setSavedDraftSuccess(false);
+    }, 4000);
+
+    return draftRecord;
+  };
+
+  // Issue Notice and update proceeding history
+  const handleIssueNotice = async () => {
+    const currentDate = new Date().toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).replace(/\//g, '-');
+
+    addProceeding(
+      complaint.complaintNo,
+      currentDate,
+      docTitle,
+      noticeConfig.iconType
+    );
+
+    // Also update draft registry as issued
+    if (complaint && noticeConfig) {
+      const resolvedContacts = resolveComplaintContacts(complaint, publicBodies);
+      const draftRecord: NoticeDraftRecord = {
+        id: currentDraftRecord?.id || `draft_${complaint.complaintNo}_${noticeConfig.id}`,
+        complaintNo: complaint.complaintNo,
+        noticeTypeId: noticeConfig.id,
+        title: docTitle || noticeConfig.title,
+        category: noticeConfig.category || 'Notice',
+        contentHtml: editorRef.current?.innerHTML || '',
+        contentText: editorRef.current?.innerText || '',
+        createdAt: currentDraftRecord?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: currentDraftRecord?.createdBy || {
+          userId: user?.uid || 'user',
+          name: user?.name || user?.username || 'Official',
+          role: user?.role === 'superUser' ? 'superUser' : 'admin'
+        },
+        complainant: resolvedContacts.complainant,
+        respondent: resolvedContacts.respondent,
+        nextHearingDate: complaint.nextHearingDate || resolvedContacts.nextHearingDate || '',
+        status: 'issued',
+        dispatches: currentDraftRecord?.dispatches || [],
+        isReadBySuperUser: isSuperUser
+      };
+      saveNoticeDraft(draftRecord);
+      setCurrentDraftRecord(draftRecord);
+    }
+
+    setIssuedSuccess(true);
+    setTimeout(() => {
+      setIssuedSuccess(false);
+      onClose();
+    }, 1800);
+  };
+
+  if (!isOpen || !noticeConfig || !complaint) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-neutral-900/60 backdrop-blur-xs overflow-y-auto"
+      onClick={() => {
+        setShowColorPicker(false);
+        setShowHighlightPicker(false);
+        setShowSnippets(false);
+      }}
+    >
+      <div 
+        className={`bg-white rounded-xl shadow-2xl border border-neutral-200 w-full flex flex-col overflow-hidden transition-all duration-200 ${
+          isFullScreen 
+            ? 'fixed inset-2 z-50 max-w-none max-h-none h-[calc(100vh-16px)]' 
+            : 'max-w-5xl max-h-[95vh] h-[92vh] my-auto'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Top Bar */}
+        <div className="px-5 py-3 border-b border-neutral-200 bg-neutral-50 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-emerald-100 text-emerald-800 shrink-0">
+              <Scale className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {isRenaming ? (
+                  <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-lg border border-emerald-500 shadow-xs">
+                    <input
+                      type="text"
+                      value={renameInput}
+                      onChange={(e) => setRenameInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSaveNewTitle();
+                        } else if (e.key === 'Escape') {
+                          setIsRenaming(false);
+                          setRenameInput(docTitle);
+                        }
+                      }}
+                      className="text-sm font-bold text-neutral-900 focus:outline-none min-w-[220px] max-w-[380px]"
+                      autoFocus
+                      placeholder="Enter document title / name"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveNewTitle}
+                      className="p-1 text-white bg-emerald-600 hover:bg-emerald-700 rounded transition-colors cursor-pointer"
+                      title="Save name (Enter)"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRenaming(false);
+                        setRenameInput(docTitle);
+                      }}
+                      className="p-1 text-neutral-500 hover:bg-neutral-100 rounded transition-colors cursor-pointer"
+                      title="Cancel (Esc)"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-neutral-900 flex items-center gap-1.5">
+                      <span>Draft: {docTitle}</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRenameInput(docTitle);
+                        setIsRenaming(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-neutral-600 hover:text-emerald-800 bg-white hover:bg-emerald-50 px-2 py-0.5 rounded border border-neutral-300 hover:border-emerald-300 transition-colors cursor-pointer shadow-2xs"
+                      title="Rename this notice / order title"
+                    >
+                      <Pencil className="w-3 h-3 text-emerald-600" />
+                      <span>Rename</span>
+                    </button>
+                  </div>
+                )}
+
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${noticeConfig.tagColor}`}>
+                  {noticeConfig.tag}
+                </span>
+
+                {noticeConfig.isCustom && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                    <Sparkles className="w-2.5 h-2.5 text-purple-600" />
+                    <span>Custom</span>
+                  </span>
+                )}
+
+                <span className="text-xs text-neutral-500 font-medium">
+                  Ref: {complaintNo}
+                </span>
+
+                {titleToast && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 animate-in fade-in">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    <span>{titleToast}</span>
+                  </span>
+                )}
+
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300">
+                  <Edit3 className="w-3 h-3 text-emerald-600" />
+                  <span>Rich Text Editor Active</span>
+                </span>
+              </div>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                Click anywhere on the document to edit text directly with full rich formatting, or click Rename above to change title
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {isSuperUser && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const saved = await handleSaveDraft();
+                  if (saved) {
+                    setIsDispatchModalOpen(true);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-all cursor-pointer"
+                title="Dispatch draft notice via Gmail & WhatsApp"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Send via Gmail/WhatsApp</span>
+                <span className="sm:hidden">Send</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 transition-all cursor-pointer"
+              title="Copy rich formatted document to clipboard (Word/Docs/Email compatible)"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-emerald-700 font-bold">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-neutral-500" />
+                  <span>Copy Draft</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 transition-all cursor-pointer"
+              title="Print official letterhead draft (clean print without toolbar)"
+            >
+              <Printer className="w-3.5 h-3.5 text-neutral-500" />
+              <span>Print</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 transition-all cursor-pointer"
+              title="Download official PDF of this draft (with header, parties, and next hearing date)"
+            >
+              <FileDown className="w-3.5 h-3.5 text-red-600" />
+              <span>PDF</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsFullScreen(!isFullScreen)}
+              className="p-1.5 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-200/70 rounded-lg transition-colors cursor-pointer"
+              title={isFullScreen ? 'Exit full screen' : 'Expand full screen'}
+            >
+              {isFullScreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60 rounded-full transition-colors cursor-pointer ml-1"
+              aria-label="Close dialog"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Toast / Status feedback banner */}
+        {draftToastMsg && (
+          <div className="px-5 py-2.5 bg-emerald-50 border-b border-emerald-200 text-emerald-800 text-xs flex items-center justify-between animate-in fade-in shrink-0">
+            <div className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="font-medium">{draftToastMsg}</span>
+            </div>
+            {isSuperUser && !isDispatchModalOpen && (
+              <button
+                type="button"
+                onClick={() => setIsDispatchModalOpen(true)}
+                className="text-xs font-bold text-emerald-900 underline hover:text-emerald-700 cursor-pointer flex items-center gap-1"
+              >
+                <span>Dispatch via Gmail &amp; WhatsApp now</span>
+                <span>&rarr;</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Rich Text Editor Formatting Ribbon (Docked Toolbar) */}
+        <div className="px-4 py-2 border-b border-neutral-200 bg-white flex items-center justify-between gap-2 overflow-x-auto shrink-0 shadow-2xs">
+          
+          <div className="flex items-center gap-1 flex-wrap">
+            
+            {/* Undo / Redo */}
+            <div className="flex items-center gap-0.5 pr-1.5 border-r border-neutral-200">
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('undo'); }}
+                className="p-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors cursor-pointer"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('redo'); }}
+                className="p-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded transition-colors cursor-pointer"
+                title="Redo (Ctrl+Y)"
+              >
+                <Redo className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Paragraph Style Dropdown */}
+            <div className="pr-1.5 border-r border-neutral-200">
+              <select
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'p') executeCommand('formatBlock', '<p>');
+                  else if (val === 'h1') executeCommand('formatBlock', '<h1>');
+                  else if (val === 'h2') executeCommand('formatBlock', '<h2>');
+                  else if (val === 'h3') executeCommand('formatBlock', '<h3>');
+                  else if (val === 'blockquote') executeCommand('formatBlock', '<blockquote>');
+                  e.target.value = 'default';
+                }}
+                defaultValue="default"
+                className="text-xs bg-neutral-50 border border-neutral-200 text-neutral-700 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                title="Paragraph / Heading Style"
+              >
+                <option value="default" disabled>Format Style</option>
+                <option value="p">Normal Text</option>
+                <option value="h1">Heading 1 (Main)</option>
+                <option value="h2">Heading 2 (Subhead)</option>
+                <option value="h3">Heading 3 (Section)</option>
+                <option value="blockquote">Legal Quotation</option>
+              </select>
+            </div>
+
+            {/* Font Family */}
+            <div className="pr-1.5 border-r border-neutral-200">
+              <select
+                onChange={(e) => {
+                  executeCommand('fontName', e.target.value);
+                  e.target.value = 'default';
+                }}
+                defaultValue="default"
+                className="text-xs bg-neutral-50 border border-neutral-200 text-neutral-700 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                title="Font Family"
+              >
+                <option value="default" disabled>Font Family</option>
+                <option value="'Merriweather', Georgia, serif">Formal Serif (Legal)</option>
+                <option value="ui-sans-serif, system-ui, sans-serif">Modern Sans-Serif</option>
+                <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                <option value="ui-monospace, monospace">Typewriter Monospace</option>
+              </select>
+            </div>
+
+            {/* Font Size */}
+            <div className="pr-1.5 border-r border-neutral-200">
+              <select
+                onChange={(e) => {
+                  executeCommand('fontSize', e.target.value);
+                  e.target.value = 'default';
+                }}
+                defaultValue="default"
+                className="text-xs bg-neutral-50 border border-neutral-200 text-neutral-700 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                title="Font Size"
+              >
+                <option value="default" disabled>Size</option>
+                <option value="2">12px (Small)</option>
+                <option value="3">14px (Standard)</option>
+                <option value="4">16px (Medium)</option>
+                <option value="5">18px (Large)</option>
+                <option value="6">22px (Title)</option>
+              </select>
+            </div>
+
+            {/* Inline Styles: Bold, Italic, Underline, Strikethrough */}
+            <div className="flex items-center gap-0.5 pr-1.5 border-r border-neutral-200">
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('bold'); }}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  activeFormats.bold 
+                    ? 'bg-emerald-100 text-emerald-900 font-bold' 
+                    : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+                title="Bold (Ctrl+B)"
+              >
+                <Bold className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('italic'); }}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  activeFormats.italic 
+                    ? 'bg-emerald-100 text-emerald-900' 
+                    : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+                title="Italic (Ctrl+I)"
+              >
+                <Italic className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('underline'); }}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  activeFormats.underline 
+                    ? 'bg-emerald-100 text-emerald-900' 
+                    : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+                title="Underline (Ctrl+U)"
+              >
+                <Underline className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('strikeThrough'); }}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  activeFormats.strikeThrough 
+                    ? 'bg-emerald-100 text-emerald-900' 
+                    : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+                title="Strikethrough"
+              >
+                <Strikethrough className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Colors: Text Color & Background Highlighter */}
+            <div className="flex items-center gap-1 pr-1.5 border-r border-neutral-200 relative">
+              
+              {/* Text Color Picker */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowColorPicker(!showColorPicker);
+                    setShowHighlightPicker(false);
+                    setShowSnippets(false);
+                  }}
+                  className="p-1.5 text-neutral-700 hover:bg-neutral-100 rounded transition-colors cursor-pointer flex items-center gap-0.5"
+                  title="Text Color"
+                >
+                  <Baseline className="w-3.5 h-3.5" />
+                  <span className="w-2 h-1 bg-neutral-900 rounded-xs"></span>
+                </button>
+
+                {showColorPicker && (
+                  <div className="absolute top-full mt-1 left-0 z-50 bg-white border border-neutral-200 rounded-lg shadow-xl p-2 flex flex-col gap-1.5 w-44">
+                    <span className="text-[10px] font-semibold text-neutral-500 uppercase px-1">Text Color</span>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[
+                        { name: 'Dark Slate', color: '#111827' },
+                        { name: 'Commission Green', color: '#065f46' },
+                        { name: 'Royal Navy', color: '#1e3a8a' },
+                        { name: 'Statutory Crimson', color: '#991b1b' },
+                        { name: 'Amber Warning', color: '#b45309' },
+                        { name: 'Dark Purple', color: '#581c87' },
+                        { name: 'Muted Gray', color: '#4b5563' },
+                        { name: 'Emerald Bright', color: '#059669' }
+                      ].map((c) => (
+                        <button
+                          key={c.color}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            executeCommand('foreColor', c.color);
+                            setShowColorPicker(false);
+                          }}
+                          className="w-7 h-7 rounded border border-neutral-300 hover:scale-110 transition-transform cursor-pointer"
+                          style={{ backgroundColor: c.color }}
+                          title={c.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Background Highlighter */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowHighlightPicker(!showHighlightPicker);
+                    setShowColorPicker(false);
+                    setShowSnippets(false);
+                  }}
+                  className="p-1.5 text-neutral-700 hover:bg-neutral-100 rounded transition-colors cursor-pointer flex items-center gap-0.5"
+                  title="Text Highlight"
+                >
+                  <Highlighter className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="w-2 h-1 bg-amber-400 rounded-xs"></span>
+                </button>
+
+                {showHighlightPicker && (
+                  <div className="absolute top-full mt-1 left-0 z-50 bg-white border border-neutral-200 rounded-lg shadow-xl p-2 flex flex-col gap-1.5 w-44">
+                    <span className="text-[10px] font-semibold text-neutral-500 uppercase px-1">Highlight Color</span>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[
+                        { name: 'Yellow', color: '#fef08a' },
+                        { name: 'Light Emerald', color: '#a7f3d0' },
+                        { name: 'Light Sky Blue', color: '#bae6fd' },
+                        { name: 'Light Rose', color: '#fecdd3' },
+                        { name: 'Light Purple', color: '#e9d5ff' },
+                        { name: 'Clear / None', color: 'transparent' }
+                      ].map((h) => (
+                        <button
+                          key={h.color}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            executeCommand('hiliteColor', h.color);
+                            setShowHighlightPicker(false);
+                          }}
+                          className="w-7 h-7 rounded border border-neutral-300 flex items-center justify-center text-[10px] font-bold hover:scale-110 transition-transform cursor-pointer"
+                          style={{ backgroundColor: h.color === 'transparent' ? '#ffffff' : h.color }}
+                          title={h.name}
+                        >
+                          {h.color === 'transparent' && '✕'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Alignments: Left, Center, Right, Justify */}
+            <div className="flex items-center gap-0.5 pr-1.5 border-r border-neutral-200">
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('justifyLeft'); }}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  activeFormats.justifyLeft ? 'bg-emerald-100 text-emerald-900' : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+                title="Align Left"
+              >
+                <AlignLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('justifyCenter'); }}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  activeFormats.justifyCenter ? 'bg-emerald-100 text-emerald-900' : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+                title="Align Center"
+              >
+                <AlignCenter className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('justifyRight'); }}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  activeFormats.justifyRight ? 'bg-emerald-100 text-emerald-900' : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+                title="Align Right"
+              >
+                <AlignRight className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('justifyFull'); }}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  activeFormats.justifyFull ? 'bg-emerald-100 text-emerald-900' : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+                title="Justify Full (Formal Legal)"
+              >
+                <AlignJustify className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Lists & Indents */}
+            <div className="flex items-center gap-0.5 pr-1.5 border-r border-neutral-200">
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('insertOrderedList'); }}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  activeFormats.insertOrderedList ? 'bg-emerald-100 text-emerald-900' : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+                title="Numbered List"
+              >
+                <ListOrdered className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('insertUnorderedList'); }}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  activeFormats.insertUnorderedList ? 'bg-emerald-100 text-emerald-900' : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+                title="Bulleted List"
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('outdent'); }}
+                className="p-1.5 text-neutral-700 hover:bg-neutral-100 rounded transition-colors cursor-pointer"
+                title="Decrease Indent"
+              >
+                <Outdent className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('indent'); }}
+                className="p-1.5 text-neutral-700 hover:bg-neutral-100 rounded transition-colors cursor-pointer"
+                title="Increase Indent"
+              >
+                <Indent className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Insert Horizontal Rule & Clear Formatting */}
+            <div className="flex items-center gap-0.5 pr-1.5 border-r border-neutral-200">
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('insertHorizontalRule'); }}
+                className="p-1.5 text-neutral-700 hover:bg-neutral-100 rounded transition-colors cursor-pointer"
+                title="Insert Divider Line"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); executeCommand('removeFormat'); }}
+                className="p-1.5 text-neutral-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                title="Clear Formatting"
+              >
+                <RemoveFormatting className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Insert / Upload Image */}
+            <div className="flex items-center gap-0.5 pr-1.5 border-r border-neutral-200">
+              <input
+                type="file"
+                ref={imageFileInputRef}
+                onChange={handleImageFileUpload}
+                accept="image/*"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  saveSelection();
+                  imageFileInputRef.current?.click();
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-neutral-100 hover:bg-emerald-50 text-neutral-800 hover:text-emerald-900 border border-neutral-300 hover:border-emerald-400 transition-colors cursor-pointer"
+                title="Upload image at cursor (or paste from clipboard with Ctrl+V / drag & drop files)"
+              >
+                <ImagePlus className="w-3.5 h-3.5 text-emerald-600" />
+                <span>+ Image</span>
+              </button>
+            </div>
+
+            {/* Statutory Snippets Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSnippets(!showSnippets);
+                  setShowColorPicker(false);
+                  setShowHighlightPicker(false);
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 transition-colors cursor-pointer"
+                title="Insert predefined RTI statutory clauses at cursor position"
+              >
+                <Sparkles className="w-3 h-3 text-emerald-600" />
+                <span>+ Legal Clause</span>
+              </button>
+
+              {showSnippets && (
+                <div className="absolute top-full mt-1.5 left-0 z-50 bg-white border border-neutral-200 rounded-lg shadow-xl p-2 w-72 flex flex-col gap-1 max-h-64 overflow-y-auto">
+                  <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-2 py-1 border-b border-neutral-100">
+                    Insert Statutory RTI Recitals
+                  </div>
+                  {STATUTORY_SNIPPETS.map((snippet) => (
+                    <button
+                      key={snippet.id}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleInsertSnippet(snippet.html);
+                      }}
+                      className="text-left px-2.5 py-1.5 rounded hover:bg-emerald-50 text-xs font-medium text-neutral-800 hover:text-emerald-950 transition-colors cursor-pointer"
+                    >
+                      {snippet.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          {/* Right Toolbar Actions: Reset Template */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleResetDraft}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 rounded transition-colors cursor-pointer"
+              title="Reset to official standard draft text"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset</span>
+            </button>
+          </div>
+
+        </div>
+
+        {/* Scrollable Letterhead Canvas Container */}
+        <div 
+          className="flex-1 overflow-y-auto p-4 sm:p-8 bg-neutral-100/70 relative"
+          onClick={() => setSelectedImage(null)}
+        >
+          {/* Image Copied Toast Notification */}
+          {imageCopiedToast && (
+            <div className="fixed top-20 right-8 z-50 bg-neutral-900 text-white text-xs px-3.5 py-2 rounded-lg shadow-xl flex items-center gap-2 animate-bounce">
+              <Check className="w-4 h-4 text-emerald-400" />
+              <span>Image copied to clipboard! You can paste (Ctrl+V) anywhere in the draft.</span>
+            </div>
+          )}
+
+          {/* Printable Document Paper Sheet */}
+          <div 
+            ref={paperSheetRef}
+            className="bg-white rounded-lg shadow-md border border-neutral-300 p-8 sm:p-14 max-w-3xl mx-auto min-h-[750px] relative focus-within:ring-2 focus-within:ring-emerald-600/30 transition-shadow"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Direct Rich Text Editable Canvas */}
+            <div
+              ref={editorRef}
+              contentEditable={true}
+              suppressContentEditableWarning={true}
+              onInput={handleEditorInput}
+              onKeyUp={updateActiveFormats}
+              onMouseUp={updateActiveFormats}
+              onClick={handleEditorClick}
+              onPaste={handleEditorPaste}
+              onDragStart={handleEditorDragStart}
+              onDragOver={handleEditorDragOver}
+              onDrop={handleEditorDrop}
+              className="outline-none min-h-[650px] text-neutral-900 leading-relaxed draft-editor-content focus:outline-none"
+              style={{
+                wordBreak: 'break-word',
+              }}
+            />
+
+            {/* Selected Image Interactive Resize & Drag Controls Overlay */}
+            {selectedImage && imageOverlayRect && (
+              <div
+                className="absolute pointer-events-none z-30 print:hidden"
+                style={{
+                  top: `${imageOverlayRect.top}px`,
+                  left: `${imageOverlayRect.left}px`,
+                  width: `${imageOverlayRect.width}px`,
+                  height: `${imageOverlayRect.height}px`,
+                }}
+              >
+                {/* Visual selection outline */}
+                <div className="absolute inset-0 border-2 border-emerald-600 rounded shadow-sm pointer-events-none" />
+
+                {/* Top Badge: Drag Instruction & Size */}
+                <div className="absolute -top-7 left-0 pointer-events-auto bg-emerald-800 text-white text-[10px] font-medium px-2 py-0.5 rounded shadow flex items-center gap-1.5 whitespace-nowrap">
+                  <Move className="w-3 h-3 text-emerald-300" />
+                  <span>Drag image anywhere to move</span>
+                  {imageSizeLabel && (
+                    <span className="bg-emerald-950/60 px-1 rounded text-emerald-200 text-[9px] font-mono">
+                      {imageSizeLabel}
+                    </span>
+                  )}
+                </div>
+
+                {/* Floating Controls Bar */}
+                <div 
+                  className="absolute left-1/2 -translate-x-1/2 -bottom-11 pointer-events-auto bg-neutral-900/95 text-white py-1 px-1.5 rounded-lg shadow-2xl flex items-center gap-1 z-40 backdrop-blur-xs text-xs whitespace-nowrap"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Decrease Size */}
+                  <button
+                    type="button"
+                    onClick={handleDecreaseSize}
+                    className="p-1 hover:bg-neutral-800 rounded text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                    title="Decrease Size (-35px)"
+                  >
+                    <ZoomOut className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Increase Size */}
+                  <button
+                    type="button"
+                    onClick={handleIncreaseSize}
+                    className="p-1 hover:bg-neutral-800 rounded text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                    title="Increase Size (+35px)"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5" />
+                  </button>
+
+                  <span className="w-px h-3 bg-neutral-700 mx-0.5" />
+
+                  {/* Quick Preset Buttons */}
+                  {(['25%', '50%', '75%', '100%'] as const).map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => handleSetSizePreset(preset)}
+                      className="px-1.5 py-0.5 text-[10px] font-semibold hover:bg-neutral-800 rounded text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                      title={`Set image width to ${preset}`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+
+                  <span className="w-px h-3 bg-neutral-700 mx-0.5" />
+
+                  {/* Alignment options */}
+                  <button
+                    type="button"
+                    onClick={() => handleSetAlignment('left')}
+                    className="p-1 hover:bg-neutral-800 rounded text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                    title="Float Left (text wraps around right)"
+                  >
+                    <AlignLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetAlignment('center')}
+                    className="p-1 hover:bg-neutral-800 rounded text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                    title="Center Align (block)"
+                  >
+                    <AlignCenter className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetAlignment('right')}
+                    className="p-1 hover:bg-neutral-800 rounded text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                    title="Float Right (text wraps around left)"
+                  >
+                    <AlignRight className="w-3.5 h-3.5" />
+                  </button>
+
+                  <span className="w-px h-3 bg-neutral-700 mx-0.5" />
+
+                  {/* Copy to Clipboard */}
+                  <button
+                    type="button"
+                    onClick={handleCopySelectedImage}
+                    className="p-1 hover:bg-neutral-800 rounded text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                    title="Copy Image to Clipboard (Ctrl+C)"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Remove Image */}
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelectedImage}
+                    className="p-1 hover:bg-red-900/70 rounded text-red-400 hover:text-red-200 transition-colors cursor-pointer"
+                    title="Delete Image (Backspace/Delete)"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* 4 Interactive Drag Handles at Corners */}
+                <div
+                  onMouseDown={(e) => handleResizeMouseDown(e, 'nw')}
+                  className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-white border-2 border-emerald-600 rounded-xs cursor-nwse-resize pointer-events-auto shadow hover:scale-125 transition-transform"
+                  title="Drag to resize (Top-Left)"
+                />
+                <div
+                  onMouseDown={(e) => handleResizeMouseDown(e, 'ne')}
+                  className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-white border-2 border-emerald-600 rounded-xs cursor-nesw-resize pointer-events-auto shadow hover:scale-125 transition-transform"
+                  title="Drag to resize (Top-Right)"
+                />
+                <div
+                  onMouseDown={(e) => handleResizeMouseDown(e, 'sw')}
+                  className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-white border-2 border-emerald-600 rounded-xs cursor-nesw-resize pointer-events-auto shadow hover:scale-125 transition-transform"
+                  title="Drag to resize (Bottom-Left)"
+                />
+                <div
+                  onMouseDown={(e) => handleResizeMouseDown(e, 'se')}
+                  className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-white border-2 border-emerald-600 rounded-xs cursor-nwse-resize pointer-events-auto shadow hover:scale-125 transition-transform"
+                  title="Drag to resize (Bottom-Right)"
+                />
+              </div>
+            )}
+
+          </div>
+
+        </div>
+
+        {/* Modal Footer Status Bar & Action Buttons */}
+        <div className="px-6 py-3 border-t border-neutral-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+          
+          {/* Word / Char Count & Status */}
+          <div className="text-xs text-neutral-500 flex items-center gap-3">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span><strong>{wordCount}</strong> words</span>
+              <span className="text-neutral-300">•</span>
+              <span><strong>{charCount}</strong> characters</span>
+            </span>
+            <span className="hidden md:inline text-neutral-400">|</span>
+            <span className="hidden md:inline text-[11px] text-neutral-500">
+              Changes auto-saved locally for Complaint No. <strong>{complaintNo}</strong>
+            </span>
+          </div>
+
+          {/* Action Controls */}
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg border border-neutral-200 transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border transition-all shadow-2xs cursor-pointer ${
+                savedDraftSuccess 
+                  ? 'bg-emerald-100 text-emerald-900 border-emerald-300 font-bold' 
+                  : 'bg-white hover:bg-neutral-50 text-neutral-700 border-neutral-300'
+              }`}
+              title="Save this draft to notify SuperUser and enable dispatch"
+            >
+              {savedDraftSuccess ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Draft Saved!</span>
+                </>
+              ) : (
+                <>
+                  <Bookmark className="w-3.5 h-3.5 text-neutral-500" />
+                  <span>Save Draft</span>
+                </>
+              )}
+            </button>
+
+            {isSuperUser && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const saved = await handleSaveDraft();
+                  if (saved) {
+                    setIsDispatchModalOpen(true);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-2xs cursor-pointer"
+                title="Send to Complainant and Designated Official via Gmail and WhatsApp"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Send via Gmail / WhatsApp</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleIssueNotice}
+              disabled={issuedSuccess}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white rounded-lg transition-all shadow-xs cursor-pointer ${
+                issuedSuccess 
+                  ? 'bg-emerald-600 hover:bg-emerald-700' 
+                  : 'bg-emerald-700 hover:bg-emerald-800'
+              }`}
+              title="Formally issue this edited notice/order and record in Proceeding History"
+            >
+              {issuedSuccess ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Notice Issued &amp; Saved!</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Issue {noticeConfig.category} &amp; Record</span>
+                </>
+              )}
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* Draft Dispatch Modal for SuperUser */}
+      {isDispatchModalOpen && currentDraftRecord && (
+        <DraftDispatchModal
+          isOpen={isDispatchModalOpen}
+          onClose={() => setIsDispatchModalOpen(false)}
+          draft={currentDraftRecord}
+          onDispatchRecorded={() => {
+            const updated = getDraftsForComplaint(complaint.complaintNo).find(d => d.id === currentDraftRecord.id);
+            if (updated) setCurrentDraftRecord(updated);
+          }}
+        />
+      )}
+    </div>
+  );
+}

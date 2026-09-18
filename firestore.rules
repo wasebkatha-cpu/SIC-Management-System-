@@ -1,0 +1,73 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isSuperUser() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superUser';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /system/{docId} {
+      allow read: if true;
+      allow write: if isSuperUser() || (isSignedIn() && !exists(/databases/$(database)/documents/system/config));
+    }
+
+    // users collection
+    match /users/{userId} {
+      // SuperUser can read/write everything.
+      // Admin/User can read their own profile.
+      allow read: if isSuperUser() || isOwner(userId);
+      
+      // Allow initial superuser creation if none exists.
+      allow create: if isSuperUser() || (isOwner(userId) && !exists(/databases/$(database)/documents/system/config));
+      allow update: if isSuperUser() || (isOwner(userId) && incoming().role == existing().role); // Can't change own role
+      allow delete: if isSuperUser();
+    }
+
+    match /activity_logs/{logId} {
+      // SuperUser can read all logs.
+      // Admin can read their own logs.
+      allow read: if isSuperUser() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      
+      // Anyone signed in can create a log for themselves
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      
+      // Logs are immutable
+      allow update, delete: if false;
+    }
+
+    match /notice_templates/{templateId} {
+      // Notice templates can be viewed by all users across complaints
+      allow read: if true;
+      // Allow creation/modification of notice templates
+      allow write: if true;
+    }
+  }
+}
