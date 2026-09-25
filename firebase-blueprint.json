@@ -1,0 +1,46 @@
+{
+  "entities": {
+    "User": {
+      "fields": {
+        "email": "string",
+        "role": "string",
+        "username": "string",
+        "name": "string",
+        "createdAt": "timestamp"
+      }
+    },
+    "ActivityLog": {
+      "fields": {
+        "userId": "string",
+        "username": "string",
+        "role": "string",
+        "activity": "string",
+        "timestamp": "timestamp"
+      }
+    },
+    "NoticeTemplate": {
+      "fields": {
+        "title": "string",
+        "stageName": "string",
+        "category": "string",
+        "tag": "string",
+        "tagColor": "string",
+        "iconType": "string",
+        "description": "string",
+        "isCustom": "boolean",
+        "createdAt": "timestamp"
+      }
+    }
+  },
+  "firestore": {
+    "users": {
+      "entity": "User"
+    },
+    "activity_logs": {
+      "entity": "ActivityLog"
+    },
+    "notice_templates": {
+      "entity": "NoticeTemplate"
+    }
+  }
+}

@@ -1,0 +1,119 @@
+@import "tailwindcss";
+@import "../node_modules/@syncfusion/ej2-base/styles/tailwind.css";
+@import "../node_modules/@syncfusion/ej2-react-buttons/styles/tailwind.css";
+@import "../node_modules/@syncfusion/ej2-react-inputs/styles/tailwind.css";
+@import "../node_modules/@syncfusion/ej2-react-popups/styles/tailwind.css";
+@import "../node_modules/@syncfusion/ej2-react-lists/styles/tailwind.css";
+@import "../node_modules/@syncfusion/ej2-react-navigations/styles/tailwind.css";
+@import "../node_modules/@syncfusion/ej2-react-splitbuttons/styles/tailwind.css";
+@import "../node_modules/@syncfusion/ej2-react-dropdowns/styles/tailwind.css";
+@import "../node_modules/@syncfusion/ej2-react-documenteditor/styles/tailwind.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Global dark theme base styles */
+.dark {
+  color: #ffffff;
+  color-scheme: dark;
+}
+
+.dark body {
+  background-color: #080c16;
+  color: #ffffff;
+}
+
+/* Ensure headings and text are crisp white in dark mode */
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6 {
+  color: #ffffff !important;
+}
+
+/* Transform neutral/gray text into high-contrast white in dark mode */
+.dark .text-neutral-900,
+.dark .text-neutral-800,
+.dark .text-neutral-700,
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700 {
+  color: #ffffff !important;
+}
+
+.dark .text-neutral-600,
+.dark .text-gray-600 {
+  color: #f1f5f9 !important; /* light slate near white */
+}
+
+.dark .text-neutral-500,
+.dark .text-gray-500 {
+  color: #e2e8f0 !important; /* bright legible slate-200 */
+}
+
+.dark .text-neutral-400,
+.dark .text-gray-400 {
+  color: #cbd5e1 !important; /* slate-300 */
+}
+
+/* Dark mode inputs, selects, textareas */
+.dark input[type="text"],
+.dark input[type="search"],
+.dark input[type="password"],
+.dark input[type="number"],
+.dark input[type="date"],
+.dark textarea,
+.dark select {
+  color: #ffffff !important;
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+.dark select option {
+  background-color: #0f172a;
+  color: #ffffff;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Remove scrollbar from the entire app without removing scroll functionality */
+html,
+body,
+#root,
+*,
+*::before,
+*::after {
+  -ms-overflow-style: none !important; /* IE and Edge */
+  scrollbar-width: none !important; /* Firefox */
+}
+
+*::-webkit-scrollbar,
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+div::-webkit-scrollbar,
+nav::-webkit-scrollbar,
+aside::-webkit-scrollbar,
+section::-webkit-scrollbar,
+main::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari and Opera */
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+.no-scrollbar::-webkit-scrollbar,
+.custom-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar,
+.custom-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}

@@ -1,0 +1,16 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+build-win/
+.gemini/
+
+dist-*/
+sic-management-system-*/
+build-src/
+installer/
