@@ -1,0 +1,32 @@
+<service>
+	<id>sicmanagementsystem.exe</id>
+	<name>SIC Management System</name>
+	<description>Runs the SIC Management System backend and serves the frontend.</description>
+	<executable>C:\Program Files\nodejs\node.exe</executable>
+	<argument>--harmony</argument>
+	<argument>--max_old_space_size=4096</argument>
+	<argument>E:\SIC-Management-System\node_modules\node-windows\lib\wrapper.js</argument>
+	<argument>--file</argument>
+	<argument>E:\SIC-Management-System\server\index.js</argument>
+	<argument>--scriptoptions=</argument>
+	<argument>--log</argument>
+	<argument>SIC Management System wrapper</argument>
+	<argument>--grow</argument>
+	<argument>0.25</argument>
+	<argument>--wait</argument>
+	<argument>1</argument>
+	<argument>--maxrestarts</argument>
+	<argument>3</argument>
+	<argument>--abortonerror</argument>
+	<argument>n</argument>
+	<argument>--stopparentfirst</argument>
+	<argument>undefined</argument>
+	<logmode>rotate</logmode>
+	<stoptimeout>30sec</stoptimeout>
+	<serviceaccount>
+		<domain>FARRUKH</domain>
+		<user>LocalSystem</user>
+		<password></password>
+	</serviceaccount>
+	<workingdirectory>E:\SIC-Management-System</workingdirectory>
+</service>
